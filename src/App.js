@@ -68,7 +68,11 @@ function App() {
 
     // --- Scales ---
     const maxCap = d3.max(coins, (d) => d.market_cap || 0);
-    const rScale = d3.scaleSqrt().domain([0, maxCap]).range([30, 120]);
+    const isMobile = window.innerWidth < 768;
+    const rScale = d3
+  .scaleSqrt()
+  .domain([0, maxCap])
+  .range(isMobile ? [10, 45] : [20, 90]);
     const color = (change) => {
       if (change === null || change === undefined) return "#555";
       const t = Math.max(-20, Math.min(20, change)) / 40 + 0.5;
@@ -237,7 +241,11 @@ function App() {
       >
         🪙 Crypto Dashboard - Top 50 Real-Time Visualizer by Kri 🪙
       </h1>
-      <svg ref={svgRef} width="1300" height="800"></svg>
+      <svg
+      ref={svgRef}
+      viewBox="0 0 1300 800"
+      style={{ width: "100%", height: "auto", maxHeight: "90vh" }}
+      ></svg>
     </div>
   );
 }
