@@ -25,12 +25,12 @@ function App() {
   useEffect(() => {
     if (!coins.length) return;
 
-    const width = 1300;
-    const height = 800;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    // ✨ Glow Gradient + Gold Shine
+    // --- Define gold gradients and glow ---
     svg.append("defs").html(`
       <radialGradient id="goldGradient" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#fff7d1"/>
@@ -47,7 +47,7 @@ function App() {
       </filter>
     `);
 
-    // Particle background ✨
+    // --- Background sparkles ✨ ---
     const makeSparkle = () => {
       d3.range(80).forEach(() => {
         svg
@@ -64,21 +64,26 @@ function App() {
       });
     };
     makeSparkle();
-    setInterval(makeSparkle, 3000);
+    const sparkleInterval = setInterval(makeSparkle, 3000);
 
-    // --- Scales ---
+    // --- Scale & Color ---
     const maxCap = d3.max(coins, (d) => d.market_cap || 0);
-    const isMobile = window.innerWidth < 768;
+    const isMobile = width < 768;
     const rScale = d3
-  .scaleSqrt()
-  .domain([0, maxCap])
-  .range(isMobile ? [10, 45] : [20, 90]);
+      .scaleSqrt()
+      .domain([0, maxCap])
+      .range(isMobile ? [10, 45] : [20, 90]);
+
     const color = (change) => {
       if (change === null || change === undefined) return "#555";
       const t = Math.max(-20, Math.min(20, change)) / 40 + 0.5;
       return d3.interpolateRgbBasis(["#ff0033", "#FFD700", "#00ff88"])(t);
     };
 
+    // --- Create main group for zoom ---
+    const g = svg.append("g").attr("class", "coin-layer");
+
+    // --- Nodes setup ---
     const nodes = coins.map((d) => ({
       ...d,
       r: rScale(d.market_cap),
@@ -87,6 +92,7 @@ function App() {
       driftPhase: Math.random() * Math.PI * 2,
     }));
 
+    // --- Physics simulation ---
     const simulation = d3
       .forceSimulation(nodes)
       .force("charge", d3.forceManyBody().strength(12))
@@ -94,11 +100,13 @@ function App() {
       .force("collision", d3.forceCollide().radius((d) => d.r + 3))
       .on("tick", ticked);
 
-    const node = svg
-      .selectAll("g")
+    // --- Create coin groups ---
+    const node = g
+      .selectAll("g.coin")
       .data(nodes)
       .enter()
       .append("g")
+      .attr("class", "coin")
       .attr("cursor", "pointer")
       .call(
         d3
@@ -110,7 +118,7 @@ function App() {
       .on("click", (e, d) =>
         window.open(`https://www.coingecko.com/en/coins/${d.id}`, "_blank")
       )
-      .on("mouseover", function (e, d) {
+      .on("mouseover", function () {
         d3.select(this)
           .select("circle")
           .transition()
@@ -130,16 +138,15 @@ function App() {
           .style("filter", "url(#glow)");
       });
 
-    // 💰 Golden Coin
+    // --- Coin Body ---
     node
       .append("circle")
       .attr("r", (d) => d.r)
       .attr("fill", "url(#goldGradient)")
       .attr("stroke", "#FFD700")
-      .attr("stroke-width", 4)
-      .attr("class", "gold-coin");
+      .attr("stroke-width", 4);
 
-    // 🪙 Logo
+    // --- Coin Logo ---
     node
       .append("image")
       .attr("xlink:href", (d) => d.image)
@@ -149,7 +156,7 @@ function App() {
       .attr("height", (d) => d.r * 0.9)
       .attr("clip-path", "circle()");
 
-    // 🧾 Info text (inside coin)
+    // --- Coin Text ---
     const textBlock = node
       .append("text")
       .attr("text-anchor", "middle")
@@ -191,7 +198,7 @@ function App() {
       .style("fill", "#f9e88b")
       .text((d) => `MC: ${d3.format(".2s")(d.market_cap).replace("G", "B")}`);
 
-    // 🌊 Floating Drift Animation
+    // --- Floating Drift Animation ---
     const floatSpeed = 0.015;
     d3.timer((elapsed) => {
       nodes.forEach((d) => {
@@ -201,6 +208,17 @@ function App() {
       simulation.alpha(0.07).restart();
     });
 
+    // --- D3 Zoom & Pan ---
+    const zoom = d3
+      .zoom()
+      .scaleExtent([0.5, 3])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+
+    svg.call(zoom);
+
+    // --- Simulation tick & drag ---
     function ticked() {
       node.attr("transform", (d) => `translate(${d.x},${d.y})`);
     }
@@ -219,17 +237,34 @@ function App() {
       e.subject.fy = null;
     }
 
-    return () => simulation.stop();
+    // --- Responsive resize ---
+    const handleResize = () => {
+      const newWidth = window.innerWidth;
+      const newHeight = window.innerHeight;
+      svg.attr("viewBox", `0 0 ${newWidth} ${newHeight}`);
+      simulation.force("center", d3.forceCenter(newWidth / 2, newHeight / 2));
+      simulation.alpha(0.5).restart();
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      simulation.stop();
+      clearInterval(sparkleInterval);
+      window.removeEventListener("resize", handleResize);
+    };
   }, [coins]);
 
   return (
     <div
       style={{
-        background: "radial-gradient(circle at 50% 50%, #0a0a0a, #000)",
-        minHeight: "100vh",
+        background: "radial-gradient(circle at 50% 50%, #080808, #000)",
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
         color: "#fff",
         textAlign: "center",
-        overflow: "hidden",
+        margin: 0,
+        padding: 0,
       }}
     >
       <h1
@@ -239,17 +274,22 @@ function App() {
           letterSpacing: "2px",
         }}
       >
-        🪙 Crypto Dashboard - Top 50 Real-Time Visualizer by Kri 🪙
+        🪙 Crypto Dashboard – Top 50 Real-Time Visualizer by Kri (v5.0)
       </h1>
+
       <svg
-      ref={svgRef}
-      viewBox="0 0 1300 800"
-      style={{ width: "100%", height: "auto", maxHeight: "90vh" }}
+        ref={svgRef}
+        viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "block",
+          touchAction: "none", // mobile-friendly gesture control
+        }}
       ></svg>
     </div>
   );
 }
 
 export default App;
-
-   
