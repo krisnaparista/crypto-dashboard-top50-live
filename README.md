@@ -7,6 +7,7 @@ A real-time crypto visualizer built with React + D3.js + CoinGecko API.
 - 💫 Interactive bubbles with 3D coin styling  
 - ⚡ Built for deployment on Vercel
 
+
 ## Run locally
 ```bash
 npm install
